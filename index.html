@@ -1,0 +1,229 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1,viewport-fit=cover">
+<title>StudioCut — Mobile Video Editor</title>
+<style>
+:root{--bg:#090a0d;--panel:#14161b;--panel2:#1d2027;--text:#f5f6f8;--muted:#9da3ad;--accent:#ff3158}
+*{box-sizing:border-box;-webkit-tap-highlight-color:transparent}
+body{margin:0;background:var(--bg);color:var(--text);font-family:Inter,system-ui,Arial,sans-serif;overflow:hidden}
+button,input{font:inherit} button{border:0;color:inherit;background:none;cursor:pointer}
+.app{height:100vh;height:100dvh;display:flex;flex-direction:column;max-width:900px;margin:auto}
+.top{height:58px;display:flex;align-items:center;justify-content:space-between;padding:0 14px;background:#0c0d10;border-bottom:1px solid #22252b}
+.brand{font-size:19px;font-weight:800;letter-spacing:.2px}.brand span{color:var(--accent)}
+.top .btn{background:#252932;border-radius:10px;padding:9px 14px;font-weight:700}.top .export{background:var(--accent)}
+.stage{flex:1;min-height:0;display:flex;align-items:center;justify-content:center;background:#050507;position:relative}
+.canvasWrap{width:min(94%,560px);height:min(75%,600px);display:flex;align-items:center;justify-content:center}
+canvas{max-width:100%;max-height:100%;background:#111;box-shadow:0 12px 45px #000;border-radius:2px}
+.empty{position:absolute;text-align:center;color:var(--muted);padding:30px}.empty b{display:block;color:white;font-size:20px;margin-bottom:8px}
+.controls{background:var(--panel);border-top:1px solid #24272d}
+.timeline{height:84px;padding:10px 14px 8px;display:flex;flex-direction:column;gap:8px}
+.track{height:42px;background:var(--panel2);border-radius:8px;position:relative;overflow:hidden}
+.track .fill{position:absolute;inset:0;background:linear-gradient(90deg,#353944,#22252d)}
+.playhead{position:absolute;top:0;bottom:0;width:2px;background:var(--accent);left:0;z-index:3}
+.range{width:100%;accent-color:var(--accent)}
+.tools{height:92px;display:flex;overflow-x:auto;gap:8px;padding:9px 10px 12px;scrollbar-width:none}
+.tools::-webkit-scrollbar{display:none}
+.tool{min-width:66px;height:68px;border-radius:12px;background:#1d2027;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:6px;color:#dce0e7}
+.tool.active{background:#332029;color:#ff5474}.ico{font-size:22px}.lbl{font-size:11px}
+.drawer{position:absolute;left:0;right:0;bottom:0;background:#15171c;border-top:1px solid #2a2d34;padding:12px 14px 18px;display:none;z-index:10;max-height:47%}
+.drawer.open{display:block}.drawer h3{margin:0 0 12px;font-size:15px}
+.row{display:flex;align-items:center;gap:10px;margin:10px 0}.row label{width:78px;color:var(--muted);font-size:13px}.row input[type=range]{flex:1}
+.chips{display:flex;gap:8px;overflow:auto}.chip{padding:9px 12px;background:#252932;border-radius:9px;white-space:nowrap}.chip.on{background:var(--accent)}
+.textInput{flex:1;background:#24272e;color:white;border:1px solid #383c45;border-radius:9px;padding:10px;outline:none}
+.aspect button{padding:9px 13px;background:#252932;border-radius:9px}.aspect .on{background:var(--accent)}
+.file{display:none}
+@media(max-width:520px){.stage{min-height:0}.canvasWrap{width:96%;height:72%}.timeline{height:80px}.tools{height:88px}.top{height:54px}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <button class="btn" id="newBtn">＋ New</button>
+    <div class="brand">Studio<span>Cut</span></div>
+    <button class="btn export" id="exportBtn">Export</button>
+  </header>
+
+  <main class="stage">
+    <div class="canvasWrap"><canvas id="canvas" width="720" height="1280"></canvas></div>
+    <div class="empty" id="empty"><b>Start creating</b>Import a video or photo to begin</div>
+    <video id="video" playsinline muted style="display:none"></video>
+    <img id="photo" alt="" style="display:none">
+  </main>
+
+  <section class="controls">
+    <div class="timeline">
+      <div class="track"><div class="fill"></div><div class="playhead" id="playhead"></div></div>
+      <input id="scrub" type="range" min="0" max="1" step=".01" value="0">
+    </div>
+    <div class="tools">
+      <button class="tool" id="mediaBtn"><span class="ico">＋</span><span class="lbl">Media</span></button>
+      <button class="tool" id="trimBtn"><span class="ico">✂</span><span class="lbl">Trim</span></button>
+      <button class="tool" id="filterBtn"><span class="ico">◐</span><span class="lbl">Filter</span></button>
+      <button class="tool" id="adjustBtn"><span class="ico">☼</span><span class="lbl">Adjust</span></button>
+      <button class="tool" id="textBtn"><span class="ico">T</span><span class="lbl">Text</span></button>
+      <button class="tool" id="speedBtn"><span class="ico">1×</span><span class="lbl">Speed</span></button>
+      <button class="tool" id="rotateBtn"><span class="ico">↻</span><span class="lbl">Rotate</span></button>
+      <button class="tool" id="ratioBtn"><span class="ico">▣</span><span class="lbl">Canvas</span></button>
+      <button class="tool" id="musicBtn"><span class="ico">♫</span><span class="lbl">Music</span></button>
+    </div>
+  </section>
+
+  <div class="drawer" id="drawer"></div>
+</div>
+
+<input class="file" id="mediaInput" type="file" accept="video/*,image/*">
+<input class="file" id="audioInput" type="file" accept="audio/*">
+<audio id="audio" style="display:none"></audio>
+
+<script>
+const $=s=>document.querySelector(s);
+const canvas=$("#canvas"),ctx=canvas.getContext("2d");
+const video=$("#video"),photo=$("#photo"),empty=$("#empty"),scrub=$("#scrub"),playhead=$("#playhead");
+const drawer=$("#drawer"),mediaInput=$("#mediaInput"),audioInput=$("#audioInput"),audio=$("#audio");
+
+let state={
+ type:null,url:null,start:0,end:0,duration:0,playing:false,
+ filter:"none",brightness:100,contrast:100,saturation:100,blur:0,
+ text:"",textSize:54,textColor:"#fff",rotate:0,ratio:"9:16",speed:1,volume:100
+};
+
+function openDrawer(html){drawer.innerHTML=html;drawer.classList.add("open")}
+function closeDrawer(){drawer.classList.remove("open");drawer.innerHTML=""}
+function draw(){
+  ctx.save();
+  ctx.clearRect(0,0,canvas.width,canvas.height);
+  let bg="#111";
+  ctx.fillStyle=bg;ctx.fillRect(0,0,canvas.width,canvas.height);
+
+  let source=state.type==="video"?video:photo;
+  if(source && ((state.type==="video"&&video.readyState>=2)||(state.type==="image"&&photo.complete))){
+    const sw=source.videoWidth||source.naturalWidth||canvas.width;
+    const sh=source.videoHeight||source.naturalHeight||canvas.height;
+    const cw=canvas.width,ch=canvas.height;
+    const scale=Math.max(cw/sw,ch/sh);
+    const dw=sw*scale,dh=sh*scale;
+    ctx.translate(cw/2,ch/2);ctx.rotate(state.rotate*Math.PI/180);
+    ctx.filter=`brightness(${state.brightness}%) contrast(${state.contrast}%) saturate(${state.saturation}%) blur(${state.blur}px) ${state.filter}`;
+    ctx.drawImage(source,-dw/2,-dh/2,dw,dh);
+    ctx.filter="none";
+    if(state.text){
+      ctx.fillStyle=state.textColor;ctx.textAlign="center";ctx.textBaseline="middle";
+      ctx.font=`800 ${state.textSize}px system-ui,Arial`;
+      ctx.shadowColor="rgba(0,0,0,.75)";ctx.shadowBlur=12;
+      ctx.fillText(state.text,cw/2,-ch/2+110);
+    }
+  }
+  ctx.restore();
+  if(state.duration) {
+    const p=(video.currentTime-state.start)/Math.max(.001,state.end-state.start);
+    playhead.style.left=Math.max(0,Math.min(100,p*100))+"%";
+    scrub.value=Math.max(0,Math.min(1,p));
+  }
+}
+function resizeCanvas(){
+  const [a,b]=state.ratio.split(":").map(Number);
+  const w=720,h=Math.round(720*b/a);canvas.width=w;canvas.height=h;draw();
+}
+function loadMedia(file){
+  if(!file)return;
+  state.url=URL.createObjectURL(file);
+  if(file.type.startsWith("video/")){
+    state.type="video";video.src=state.url;video.load();
+    video.onloadedmetadata=()=>{state.duration=video.duration;state.start=0;state.end=video.duration;scrub.value=0;empty.style.display="none";draw()};
+    video.onloadeddata=draw;
+    video.ontimeupdate=()=>{if(video.currentTime>=state.end){video.pause();state.playing=false;video.currentTime=state.start}draw()};
+  }else{
+    state.type="image";photo.src=state.url;photo.onload=()=>{state.duration=5;state.start=0;state.end=5;empty.style.display="none";draw()};
+  }
+}
+$("#mediaBtn").onclick=()=>mediaInput.click();
+mediaInput.onchange=e=>loadMedia(e.target.files[0]);
+$("#newBtn").onclick=()=>{mediaInput.value="";mediaInput.click()};
+
+scrub.oninput=()=>{
+ if(state.type==="video"){video.currentTime=state.start+(state.end-state.start)*Number(scrub.value);draw()}
+};
+
+$("#trimBtn").onclick=()=>{
+ if(!state.type)return alert("Import media first.");
+ openDrawer(`<h3>Trim</h3>
+ <div class="row"><label>Start</label><input id="s1" type="range" min="0" max="${state.duration}" step=".01" value="${state.start}"><b id="sv1">${state.start.toFixed(1)}s</b></div>
+ <div class="row"><label>End</label><input id="s2" type="range" min="0" max="${state.duration}" step=".01" value="${state.end}"><b id="sv2">${state.end.toFixed(1)}s</b></div>
+ <button class="chip" id="trimDone">Done</button>`);
+ const s1=$("#s1"),s2=$("#s2");
+ s1.oninput=()=>{if(+s1.value>=+s2.value)s1.value=Math.max(0,+s2.value-.1);state.start=+s1.value;$("#sv1").textContent=state.start.toFixed(1)+"s";if(video.readyState)video.currentTime=state.start;draw()};
+ s2.oninput=()=>{if(+s2.value<=+s1.value)s2.value=Math.min(state.duration,+s1.value+.1);state.end=+s2.value;$("#sv2").textContent=state.end.toFixed(1)+"s";draw()};
+ $("#trimDone").onclick=closeDrawer;
+};
+
+$("#filterBtn").onclick=()=>{
+ openDrawer(`<h3>Filters</h3><div class="chips">
+ ${["none","grayscale(1)","sepia(.7)","contrast(1.25)","saturate(1.7)","hue-rotate(35deg)","brightness(1.15)"].map((x,i)=>`<button class="chip ${state.filter===x?"on":""}" data-f="${x}">${["Original","Mono","Sepia","Punch","Vivid","Warm","Bright"][i]}</button>`).join("")}
+ </div>`);
+ drawer.querySelectorAll("[data-f]").forEach(b=>b.onclick=()=>{state.filter=b.dataset.f;draw();drawer.querySelectorAll(".chip").forEach(x=>x.classList.remove("on"));b.classList.add("on")});
+};
+
+$("#adjustBtn").onclick=()=>{
+ openDrawer(`<h3>Adjust</h3>
+ <div class="row"><label>Brightness</label><input id="br" type="range" min="50" max="150" value="${state.brightness}"></div>
+ <div class="row"><label>Contrast</label><input id="co" type="range" min="50" max="150" value="${state.contrast}"></div>
+ <div class="row"><label>Saturation</label><input id="sa" type="range" min="0" max="200" value="${state.saturation}"></div>
+ <div class="row"><label>Blur</label><input id="bl" type="range" min="0" max="8" step=".1" value="${state.blur}"></div>`);
+ $("#br").oninput=e=>{state.brightness=e.target.value;draw()};$("#co").oninput=e=>{state.contrast=e.target.value;draw()};
+ $("#sa").oninput=e=>{state.saturation=e.target.value;draw()};$("#bl").oninput=e=>{state.blur=e.target.value;draw()};
+};
+
+$("#textBtn").onclick=()=>{
+ openDrawer(`<h3>Text</h3><div class="row"><input class="textInput" id="tx" placeholder="Type your text..." value="${state.text.replace(/"/g,"&quot;")}"><button class="chip" id="txDone">Done</button></div>
+ <div class="row"><label>Size</label><input id="ts" type="range" min="20" max="110" value="${state.textSize}"></div>`);
+ $("#tx").oninput=e=>{state.text=e.target.value;draw()};$("#ts").oninput=e=>{state.textSize=+e.target.value;draw()};$("#txDone").onclick=closeDrawer;
+};
+
+$("#speedBtn").onclick=()=>{
+ openDrawer(`<h3>Speed</h3><div class="chips">${[.25,.5,1,1.5,2,3].map(x=>`<button class="chip ${state.speed===x?"on":""}" data-s="${x}">${x}×</button>`).join("")}</div>`);
+ drawer.querySelectorAll("[data-s]").forEach(b=>b.onclick=()=>{state.speed=+b.dataset.s;video.playbackRate=state.speed;drawer.querySelectorAll(".chip").forEach(x=>x.classList.remove("on"));b.classList.add("on")});
+};
+
+$("#rotateBtn").onclick=()=>{state.rotate=(state.rotate+90)%360;draw()};
+$("#ratioBtn").onclick=()=>{
+ openDrawer(`<h3>Canvas / Aspect Ratio</h3><div class="chips aspect">${["9:16","1:1","4:5","16:9"].map(x=>`<button class="${state.ratio===x?"on":""}" data-r="${x}">${x}</button>`).join("")}</div>`);
+ drawer.querySelectorAll("[data-r]").forEach(b=>b.onclick=()=>{state.ratio=b.dataset.r;resizeCanvas();drawer.querySelectorAll("button").forEach(x=>x.classList.remove("on"));b.classList.add("on")});
+};
+$("#musicBtn").onclick=()=>audioInput.click();
+audioInput.onchange=e=>{const f=e.target.files[0];if(f){audio.src=URL.createObjectURL(f);audio.loop=true;audio.play();alert("Music added for preview. Export uses the edited media track.");}};
+
+canvas.addEventListener("click",()=>{if(state.type==="video"){if(video.paused){video.play();state.playing=true}else{video.pause();state.playing=false}}});
+$("#exportBtn").onclick=exportVideo;
+
+async function exportVideo(){
+ if(state.type!=="video"){alert("Export currently works with video media. Images can be edited in the preview.");return}
+ if(!window.MediaRecorder){alert("MediaRecorder is not supported in this browser.");return}
+ closeDrawer();
+ const fps=30;
+ const stream=canvas.captureStream(fps);
+ const rec=new MediaRecorder(stream,{mimeType:"video/webm;codecs=vp9"});
+ const chunks=[];
+ rec.ondataavailable=e=>e.data.size&&chunks.push(e.data);
+ rec.onstop=()=>{
+   const blob=new Blob(chunks,{type:"video/webm"}),u=URL.createObjectURL(blob);
+   const a=document.createElement("a");a.href=u;a.download="studiocut-export.webm";a.click();setTimeout(()=>URL.revokeObjectURL(u),2000);
+ };
+ const old=video.currentTime; video.pause(); rec.start();
+ const start=state.start,end=state.end;
+ video.currentTime=start;
+ const begin=performance.now();
+ function frame(now){
+   const elapsed=(now-begin)/1000*state.speed;
+   video.currentTime=Math.min(end,start+elapsed);draw();
+   if(video.currentTime>=end-.02){rec.stop();video.currentTime=old;draw();return}
+   requestAnimationFrame(frame);
+ }
+ requestAnimationFrame(frame);
+}
+
+resizeCanvas();
+</script>
+</body>
+</html>
